@@ -9,4 +9,4 @@ A minecraft backup plugin which takes advance of btrfs snapshot mechanism
 # Tips
 - The state just before you rollback is also snapshoted. However, it will not show up in backup lists. It can be found in `rollbackSnapshots` section of backups.json file. (normal backups in `backupSnapshots` section)
 
-- Rollback requires reboot the server twice. The first reboot aim to restore the backup and the second one launches your server like usual.
+- A rollback action will reboot the server twice. The first reboot aim to restore the backup and the second one launches your server as usual.

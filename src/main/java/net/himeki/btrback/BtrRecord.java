@@ -9,14 +9,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 public class BtrRecord {
-    Btrback plugin;
-    JsonObject rootObj;
-    File jsonFile;
+    static JsonObject rootObj;
+    static File jsonFile;
 
 
-    public BtrRecord(Btrback plugin) {
-        this.plugin = plugin;
-        jsonFile = new File(plugin.getRecordsJsonPath());
+    static {
+        jsonFile = BtrBack.recordsJsonPath.toFile();
         BufferedReader br = null;
         try {
             br = new BufferedReader(new FileReader(jsonFile));
@@ -25,10 +23,10 @@ public class BtrRecord {
         }
         JsonParser parser = new JsonParser();
         assert br != null;
-        this.rootObj = parser.parse(br).getAsJsonObject();
+        rootObj = parser.parse(br).getAsJsonObject();
     }
 
-    public boolean addToBackups(String timeStamp) {
+    public static boolean addToBackups(String timeStamp) {
         JsonArray backupArray = rootObj.getAsJsonArray("backupSnapshots");
         backupArray.add(timeStamp);
         rootObj.remove("backupSnapshots");
@@ -46,7 +44,7 @@ public class BtrRecord {
         return true;
     }
 
-    public boolean addToRollbacks(String timeStamp) {
+    public static boolean addToRollbacks(String timeStamp) {
         JsonArray rollbackArray = rootObj.getAsJsonArray("rollbackSnapshots");
         rollbackArray.add(timeStamp);
         rootObj.remove("rollbackSnapshots");
@@ -63,7 +61,7 @@ public class BtrRecord {
         return true;
     }
 
-    public ArrayList<String> listBackups(boolean includeIgnored) {
+    public static ArrayList<String> listBackups(boolean includeIgnored) {
         ArrayList<String> list = new ArrayList<>();
         JsonArray backupArray = rootObj.getAsJsonArray("backupSnapshots");
         JsonArray rollbackArray = rootObj.getAsJsonArray("rollbackSnapshots");
@@ -72,9 +70,9 @@ public class BtrRecord {
         if (includeIgnored)
             for (JsonElement timeStamp : rollbackArray)
                 list.add(timeStamp.getAsString());
-        list.sort((date1,date2)-> {
+        list.sort((date1, date2) -> {
             try {
-                return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS").parse(date1).compareTo(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS").parse(date2));
+                return new SimpleDateFormat("yyyy-MM-dd'T'HH-mm-ss").parse(date1).compareTo(new SimpleDateFormat("yyyy-MM-dd'T'HH-mm-ss").parse(date2));
             } catch (ParseException e) {
                 e.printStackTrace();
             }
@@ -84,7 +82,7 @@ public class BtrRecord {
         return list;
     }
 
-    public boolean removeRecord(String timestamp) {
+    public static boolean removeRecord(String timestamp) {
         JsonArray backupArray = rootObj.getAsJsonArray("backupSnapshots");
         JsonArray rollbackArray = rootObj.getAsJsonArray("rollbackSnapshots");
         boolean a = backupArray.remove(new JsonPrimitive(timestamp));
