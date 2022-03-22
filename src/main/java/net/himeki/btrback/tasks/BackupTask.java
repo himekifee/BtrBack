@@ -13,7 +13,8 @@ import java.util.UUID;
 public class BackupTask {
 
     public static boolean doBackup(String timeStamp, Boolean isBeforeRollback, MinecraftServer server) {
-        server.saveAll(false, true, true);
+        if (!isBeforeRollback)
+            server.saveAll(false, true, true);
         if (!BtrfsUtil.isSubVol(BtrBack.rootDir)) {
             BtrBack.LOGGER.error("The server root is not in a btrfs subvolume. Backup canceled.");
             return false;
@@ -35,8 +36,10 @@ public class BackupTask {
                 return false;
             }
         }
-        BtrBack.LOGGER.info(Formatting.GREEN + "Snapshot " + timeStamp + " has been created.");
-        server.getPlayerManager().broadcast(new LiteralText("Snapshot " + timeStamp + " has been created.").formatted(Formatting.BLUE), MessageType.CHAT, UUID.randomUUID());
+        if (!isBeforeRollback) {
+            BtrBack.LOGGER.info(Formatting.GREEN + "Snapshot " + timeStamp + " has been created.");
+            server.getPlayerManager().broadcast(new LiteralText("Snapshot " + timeStamp + " has been created.").formatted(Formatting.BLUE), MessageType.CHAT, UUID.randomUUID());
+        } else System.out.println("Snapshot " + timeStamp + " has been created.");
         return true;
     }
 }

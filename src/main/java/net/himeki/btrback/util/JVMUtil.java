@@ -1,31 +1,27 @@
 package net.himeki.btrback.util;
 
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.auoeke.reflect.Classes;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.net.URL;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 
 public class JVMUtil {
     public static List<String> getProgramArguments(String className) {
         try {
             Class.forName("org.multimc.EntryPoint");
 
-            List<String> mainArgs = ObjectArrayList.wrap(FabricLoader.getInstance().getLaunchArguments(false));
+            List<String> mainArgs = Arrays.asList(FabricLoader.getInstance().getLaunchArguments(false));
 
             // replace MultiMC's entry point with Fabric's
             mainArgs.add(0, className);
 
             return mainArgs;
         } catch (ClassNotFoundException exception) {
-            return ObjectArrayList.wrap(System.getProperty("sun.java.command").split(" "));
+            return Arrays.asList(System.getProperty("sun.java.command").split(" "));
         }
     }
 
@@ -33,11 +29,10 @@ public class JVMUtil {
         return ManagementFactory.getRuntimeMXBean().getInputArguments();
     }
 
-    public static List<String> getArgs()
-    {
-        List<String> virtualMachineArguments = new ObjectArrayList<>(JVMUtil.getVMArguments());
+    public static List<String> getArgs() {
+        List<String> virtualMachineArguments = new ArrayList<>(JVMUtil.getVMArguments());
         String home = new File(System.getProperty("java.home")).getAbsolutePath();
-        List<String> args = new ReferenceArrayList<>();
+        List<String> args = new ArrayList<>();
 
         Set<String> newClassPath = new ObjectOpenHashSet<>();
         for (URL url : Classes.urls(ClassLoader.getSystemClassLoader())) {

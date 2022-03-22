@@ -1,12 +1,13 @@
 package net.himeki.btrback.tasks;
 
+import jnr.posix.POSIX;
+import jnr.posix.POSIXFactory;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.loader.api.FabricLoader;
 import net.himeki.btrback.BtrBack;
 import net.himeki.btrback.util.BtrfsUtil;
 import net.himeki.btrback.util.JVMUtil;
 import net.minecraft.server.MinecraftServer;
-import org.apache.logging.log4j.LogManager;
 
 import java.io.*;
 import java.net.URISyntaxException;
@@ -22,15 +23,15 @@ public class RollbackTask {
     public static boolean doRollbackStageOne(String snapshotName, MinecraftServer server) {                     // Stage one of rollback process sequence, including taking a rescue snapshot and replacing serve jar
         BtrBack.reload();
         String timeStamp = new SimpleDateFormat("yyyy-MM-dd'T'HH-mm-ss").format(new Date());
-        if (!BackupTask.doBackup(timeStamp, true, server)) {
-            BtrBack.LOGGER.error("Cannot back up the latest server state. Rollback canceled.");
-            return false;
-        }
+        BackupTask.doBackup(timeStamp, true, server);
         List<String> programArguments = JVMUtil.getProgramArguments(FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT
                 ? "net.fabricmc.loader.launch.knot.KnotClient"
                 : "net.fabricmc.loader.launch.knot.KnotServer");
         List<String> args = JVMUtil.getArgs();
+        if (programArguments.get(0).endsWith(".jar"))
+            args.add("-jar");
         args.addAll(programArguments);
+        BtrBack.LOGGER.info(args);
         RollbackConfig config = new RollbackConfig(snapshotName, args, ProcessHandle.current().pid());
         try {
             FileOutputStream outputStream = new FileOutputStream("rollback.tmp");
@@ -50,28 +51,32 @@ public class RollbackTask {
             if (modJarFile.exists()) {
                 // Logic copied from GrossFabricHacks Re-launcher
 
-                // Release lock on log file
-                LogManager.shutdown();
+
                 // Add self to class path
                 var argList = JVMUtil.getArgs();
                 var cp = argList.get(argList.size() - 1);
                 cp += ":" + modJarFile;
                 argList.set(argList.size() - 1, cp);
                 argList.add("net.himeki.btrback.Rollback");
+                BtrBack.LOGGER.info(argList);
 
+                new ProcessBuilder(argList).inheritIO().start();
 
-                Thread launchBackHook = new Thread(() -> {
-                    try {
-                        System.out.println("Start calling rollback launcher...");
-                        new ProcessBuilder(argList).inheritIO().start();
-                    } catch (IOException exception) {
-                        throw new UncheckedIOException(exception);
-                    }
-                });
-                Runtime.getRuntime().addShutdownHook(launchBackHook);
+//                Thread launchBackHook = new Thread(() -> {
+//                    try {
+//
+//                        System.out.println("Exiting server...");
+//                        System.exit(0);
+//                    } catch (Exception e) {
+//                        e.printStackTrace();
+//                    }
+//
+//                });
+//                Runtime.getRuntime().addShutdownHook(launchBackHook);
+                server.stop(false);
                 return true;
             }
-        } catch (URISyntaxException e) {
+        } catch (URISyntaxException | IOException e) {
             e.printStackTrace();
         }
 
@@ -86,6 +91,10 @@ public class RollbackTask {
             RollbackConfig config = (RollbackConfig) objectInputStream.readObject();
 
             Long pid = config.pid;
+            POSIX posix = POSIXFactory.getPOSIX();
+            int[] status = new int[1];
+            posix.waitpid(pid, status, 0);
+            System.out.println("Parent exit status: " + status[0]);
             Path PWD = Paths.get(".").toAbsolutePath().normalize();
             Path parentDir = Paths.get("..").toAbsolutePath().normalize();
 
@@ -98,15 +107,15 @@ public class RollbackTask {
                 return false;
             }
 
-            Thread launchBackHook = new Thread(() -> {
-                try {
-                    System.out.println("Start calling minecraft launcher...");
-                    new ProcessBuilder(config.args).inheritIO().directory(PWD.toFile()).start();
-                } catch (IOException exception) {
-                    throw new UncheckedIOException(exception);
-                }
-            });
-            Runtime.getRuntime().addShutdownHook(launchBackHook);
+//            Thread launchBackHook = new Thread(() -> {
+            try {
+                System.out.println("Start calling minecraft launcher...");
+                new ProcessBuilder(config.args).inheritIO().directory(PWD.toFile()).start();
+            } catch (IOException exception) {
+                throw new UncheckedIOException(exception);
+            }
+//            });
+//            Runtime.getRuntime().addShutdownHook(launchBackHook);
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
         }

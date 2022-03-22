@@ -85,16 +85,16 @@ public class BtrCommand {
                             }
                         }))
                 .then(literal("rollback")
+                        .requires(serverCommandSource -> {
+                            try {
+                                return hasPermission(serverCommandSource, "btrback.rollback");
+                            } catch (CommandSyntaxException e) {
+                                e.printStackTrace();
+                            }
+                            return false;
+                        })
                         .then(argument("timestamp", StringArgumentType.string())
                                 .suggests(new BtrBackRecordsSuggestionProvider())
-                                .requires(serverCommandSource -> {
-                                    try {
-                                        return hasPermission(serverCommandSource, "btrback.rollback");
-                                    } catch (CommandSyntaxException e) {
-                                        e.printStackTrace();
-                                    }
-                                    return false;
-                                })
                                 .executes(ctx -> {
                                     ArrayList<String> backupsList = BtrRecord.listBackups(false);
                                     String arg = ctx.getArgument("timestamp", String.class);
@@ -103,7 +103,6 @@ public class BtrCommand {
                                     {
                                         if (RollbackTask.doRollbackStageOne(arg, ctx.getSource().getServer())) {
                                             ctx.getSource().sendFeedback(new LiteralText(Formatting.GREEN + "Successfully done stage one, waiting for the server to be shut down."), false);
-                                            ctx.getSource().getServer().stop(false);
                                             return 1;
                                         } else {
                                             ctx.getSource().sendFeedback(new LiteralText(Formatting.RED + "Failed to finish stage one. Check console logs for details."), false);
@@ -121,16 +120,16 @@ public class BtrCommand {
                                     }
                                 })))
                 .then(literal("purge")
+                        .requires(serverCommandSource -> {
+                            try {
+                                return hasPermission(serverCommandSource, "btrback.purge");
+                            } catch (CommandSyntaxException e) {
+                                e.printStackTrace();
+                            }
+                            return false;
+                        })
                         .then(argument("timestamp", StringArgumentType.string())
                                 .suggests(new BtrBackRecordsSuggestionProvider())
-                                .requires(serverCommandSource -> {
-                                    try {
-                                        return hasPermission(serverCommandSource, "btrback.purge");
-                                    } catch (CommandSyntaxException e) {
-                                        e.printStackTrace();
-                                    }
-                                    return false;
-                                })
                                 .executes(ctx -> {
                                     ArrayList<String> backupsList = BtrRecord.listBackups(false);
                                     String arg = ctx.getArgument("timestamp", String.class);
