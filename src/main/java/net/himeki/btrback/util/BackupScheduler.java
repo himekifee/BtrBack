@@ -7,19 +7,16 @@ import net.himeki.btrback.tasks.BackupTask;
 import net.himeki.btrback.tasks.PurgeTask;
 import net.minecraft.server.MinecraftServer;
 
-
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.Date;
+import java.util.concurrent.CompletableFuture;
 
 
 // Thanks to https://github.com/Szum123321/textile_backup
 public class BackupScheduler {
-    private BtrBackConfig config;
-
-    private boolean scheduled;
-    private long nextBackup = -1;
-    private long nextPurge = -1;
+    private long lastBackup;
+    private long lastPurge;
     private int backupInterval = 0;
     private int purgeInterval = 0;      // This is the interval to indicate which backup to purge, not period between purge task runs. Period is always 1 hour
     private boolean backupInProgress = false;
@@ -27,8 +24,9 @@ public class BackupScheduler {
 
     public boolean reloadConfig() {
         ConfigHolder<BtrBackConfig> holder = AutoConfig.getConfigHolder(BtrBackConfig.class);
-        holder.load();
-        config = holder.getConfig();
+        if (!holder.load())
+            return false;
+        var config = holder.getConfig();
         backupInterval = 0;
         backupInterval += config.backupDays * 60 * 60 * 24;
         backupInterval += config.backupHours * 60 * 60;
@@ -41,33 +39,36 @@ public class BackupScheduler {
         return true;
     }
 
-    public BackupScheduler(BtrBackConfig config) {
-        this.config = config;
+    public BackupScheduler() {
         reloadConfig();
         var now = Instant.now().getEpochSecond();
-        nextBackup = now + backupInterval;
-        nextPurge = now + 60 * 60;
+        lastBackup = now;
+        lastPurge = now;
     }
 
     public void tick(MinecraftServer server) {
-        if (backupInterval < 1 && purgeInterval < 1) return;
+        if (backupInterval < 1 || purgeInterval < 1) return;
 
         long now = Instant.now().getEpochSecond();
 
         if (!backupInProgress)
-            if (nextBackup <= now) {
+            if (lastBackup + backupInterval < now) {
                 backupInProgress = true;
-                BackupTask.doBackup(new SimpleDateFormat("yyyy-MM-dd'T'HH-mm-ss").format(new Date()), false, server);
-                nextBackup = now + backupInterval;
-                backupInProgress = false;
+                CompletableFuture.runAsync(() -> {
+                    BackupTask.doBackup(new SimpleDateFormat("yyyy-MM-dd'T'HH-mm-ss").format(new Date()), false, server);
+                    backupInProgress = false;
+                });
+                lastBackup = now;
             }
 
         if (!purgeInProgress)
-            if (nextPurge <= now) {
+            if (lastPurge + purgeInterval < now) {
                 purgeInProgress = true;
-                PurgeTask.doScheduledPurge(purgeInterval);
-                nextPurge = now + 60 * 60;
-                purgeInProgress = false;
+                CompletableFuture.runAsync(() -> {
+                    PurgeTask.doScheduledPurge(purgeInterval);
+                    purgeInProgress = false;
+                });
+                lastPurge = now;
             }
     }
 }

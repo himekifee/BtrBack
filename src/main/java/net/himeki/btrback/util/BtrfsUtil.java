@@ -3,7 +3,7 @@ package net.himeki.btrback.util;
 import java.nio.file.Path;
 
 public class BtrfsUtil {
-    static BtrfsUtilJnaInterface buInterface = BtrfsUtilJnaInterface.INSTANCE;
+    static final BtrfsUtilJnaInterface buInterface = BtrfsUtilJnaInterface.INSTANCE;
 
 
     public static boolean isSubVol(Path path) {

@@ -1,6 +1,5 @@
 package net.himeki.btrback;
 
-import com.google.gson.stream.JsonWriter;
 import me.shedaniel.autoconfig.AutoConfig;
 import me.shedaniel.autoconfig.ConfigHolder;
 import me.shedaniel.autoconfig.serializer.Toml4jConfigSerializer;
@@ -15,31 +14,24 @@ import net.himeki.btrback.util.BtrfsUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.nio.file.Path;
 
 
 public class BtrBack implements ModInitializer {
     public static boolean serverInSubVol = false;
-    public static Path rootDir = FabricLoader.getInstance().getGameDir().toAbsolutePath().normalize();
-    public static Path parentDir = rootDir.getParent().toAbsolutePath();
-    public static Path backupsDir = parentDir.resolve("btrbackups");
-    public static Path recordsJsonPath = backupsDir.resolve("backups.json");
+    public static final Path rootDir = FabricLoader.getInstance().getGameDir().toAbsolutePath().normalize();
+    public static final Path parentDir = rootDir.getParent().toAbsolutePath();
+    public static final Path backupsDir = parentDir.resolve("btrbackups");
+    public static final Path recordsJsonPath = backupsDir.resolve("backups.json");
     public static final Logger LOGGER = LogManager.getLogger();
     private static BackupScheduler scheduler;
 
 
-    public boolean loadSchedule() {
-        ConfigHolder<BtrBackConfig> holder = AutoConfig.getConfigHolder(BtrBackConfig.class);
-        holder.load();
-
-        scheduler = new BackupScheduler(holder.getConfig());
+    public void loadSchedule() {
+        scheduler = new BackupScheduler();
 
         LOGGER.info("Scheduled backup task.");
         LOGGER.info("Scheduled auto purge task.");
-        return true;
     }
 
     public static boolean reloadSchedule() {
@@ -49,43 +41,29 @@ public class BtrBack implements ModInitializer {
     @Override
     public void onInitialize() {
         ConfigHolder<BtrBackConfig> holder = AutoConfig.register(BtrBackConfig.class, Toml4jConfigSerializer::new);
-        holder.load();
-        File btrbackFolder = backupsDir.toFile();
-        if (!btrbackFolder.exists())
-            btrbackFolder.mkdir();                          //Create backup folders if not present
-        File jsonFile = recordsJsonPath.toFile();
-        if (!jsonFile.exists())                             //Create records json file
-        {
-            try {
-                JsonWriter writer = new JsonWriter(new FileWriter(jsonFile));
-                writer.beginObject();
-                writer.name("backupSnapshots");
-                writer.beginArray();
-                writer.endArray();
-                writer.name("rollbackSnapshots");
-                writer.beginArray();
-                writer.endArray();
-                writer.endObject();
-                writer.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-                LOGGER.error("Failed to create backups json file.");
-            }
+        if (!holder.load()) {
+            LOGGER.error("Error loading mod config, mod will exit immediately.");
+            return;
         }
+
+        if (!BtrRecord.checkDirectoryAndRecord()) {
+            LOGGER.error("Error checking directory and record, mod will exit immediately.");
+            return;
+        }
+
         if (!BtrfsUtil.isSubVol(rootDir)) {
             LOGGER.error("Server is not in a btrfs subvolume, mod will exit immediately.");
             return;
         }
         serverInSubVol = true;
         loadSchedule();
-        CommandRegistrationCallback.EVENT.register((dispatcher, dedicated) -> {
-            BtrCommand.register(dispatcher);
-        });
+        CommandRegistrationCallback.EVENT.register((dispatcher, dedicated) -> BtrCommand.register(dispatcher));
         ServerTickEvents.END_SERVER_TICK.register(scheduler::tick);
     }
 
-    public static void reload() {
+    public static boolean reload() {
         ConfigHolder<BtrBackConfig> holder = AutoConfig.getConfigHolder(BtrBackConfig.class);
         holder.load();
+        return reloadSchedule();
     }
 }

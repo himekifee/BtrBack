@@ -1,6 +1,7 @@
 package net.himeki.btrback;
 
 import com.google.gson.*;
+import com.google.gson.stream.JsonWriter;
 
 import java.io.*;
 import java.text.ParseException;
@@ -12,18 +13,41 @@ public class BtrRecord {
     static JsonObject rootObj;
     static File jsonFile;
 
+    public static boolean checkDirectoryAndRecord() {
+        File btrBackFolder = BtrBack.backupsDir.toFile();
+        if (!btrBackFolder.exists())
+            if (!btrBackFolder.mkdir())     //Create backup folders if not present
+                return false;
 
-    static {
         jsonFile = BtrBack.recordsJsonPath.toFile();
+        if (!jsonFile.exists())                             //Create records json file
+        {
+            try (JsonWriter writer = new JsonWriter(new FileWriter(jsonFile))) {
+                writer.setIndent("  "); // https://stackoverflow.com/questions/28758743/writing-pretty-print-json-output-to-fileoutput-stream-with-gson-jsonwriter
+                writer.beginObject();
+                writer.name("backupSnapshots");
+                writer.beginArray();
+                writer.endArray();
+                writer.name("rollbackSnapshots");
+                writer.beginArray();
+                writer.endArray();
+                writer.endObject();
+            } catch (IOException e) {
+                e.printStackTrace();
+                BtrBack.LOGGER.error("Failed to create backups json file.");
+                return false;
+            }
+        }
         BufferedReader br = null;
         try {
             br = new BufferedReader(new FileReader(jsonFile));
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
-        JsonParser parser = new JsonParser();
-        assert br != null;
-        rootObj = parser.parse(br).getAsJsonObject();
+        if (br != null)
+            rootObj = JsonParser.parseReader(br).getAsJsonObject();
+        else return false;
+        return true;
     }
 
     public static boolean addToBackups(String timeStamp) {
@@ -33,10 +57,8 @@ public class BtrRecord {
         rootObj.add("backupSnapshots", backupArray);
         String jsonString = new GsonBuilder().setPrettyPrinting().create().toJson(rootObj);
 
-        try {
-            BufferedWriter writer = new BufferedWriter(new FileWriter(jsonFile));
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(jsonFile))) {
             writer.write(jsonString);
-            writer.close();
         } catch (IOException e) {
             e.printStackTrace();
             return false;
@@ -50,10 +72,8 @@ public class BtrRecord {
         rootObj.remove("rollbackSnapshots");
         rootObj.add("rollbackSnapshots", rollbackArray);
         String jsonString = new GsonBuilder().setPrettyPrinting().create().toJson(rootObj);
-        try {
-            BufferedWriter writer = new BufferedWriter(new FileWriter(jsonFile));
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(jsonFile))) {
             writer.write(jsonString);
-            writer.close();
         } catch (IOException e) {
             e.printStackTrace();
             return false;
@@ -94,10 +114,8 @@ public class BtrRecord {
         rootObj.remove("rollbackSnapshots");
         rootObj.add("rollbackSnapshots", rollbackArray);
         String jsonString = new GsonBuilder().setPrettyPrinting().create().toJson(rootObj);
-        try {
-            BufferedWriter writer = new BufferedWriter(new FileWriter(jsonFile));
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(jsonFile))) {
             writer.write(jsonString);
-            writer.close();
         } catch (IOException e) {
             e.printStackTrace();
             return false;

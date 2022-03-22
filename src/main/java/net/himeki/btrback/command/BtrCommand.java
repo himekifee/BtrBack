@@ -13,7 +13,6 @@ import net.himeki.btrback.tasks.BackupTask;
 import net.himeki.btrback.tasks.PurgeTask;
 import net.himeki.btrback.tasks.RollbackTask;
 import net.luckperms.api.LuckPermsProvider;
-import net.minecraft.command.argument.TextArgumentType;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.LiteralText;
@@ -41,7 +40,7 @@ public class BtrCommand {
     }
 
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
-        var root = dispatcher.register(literal("btrback")
+        dispatcher.register(literal("btrback")
                 .then(literal("backup")
                         .requires(serverCommandSource -> {
                             try {
@@ -53,14 +52,15 @@ public class BtrCommand {
                         })
                         .executes(ctx -> {
                             if (BtrBack.serverInSubVol) {
-                                String timestamp = new SimpleDateFormat("yyyy-MM-dd'T'HH-mm-ss").format(new Date());
-                                if (!BackupTask.doBackup(timestamp, false, ctx.getSource().getServer())) {
-                                    ctx.getSource().sendFeedback(new LiteralText(Formatting.RED + "Backup failed. Check console for details."), false);
-                                    return -1;
-                                } else {
-                                    ctx.getSource().sendFeedback(new LiteralText(Formatting.GREEN + "Successfully created snapshot " + timestamp), false);
-                                    return 1;
-                                }
+                                CompletableFuture.runAsync(() -> {
+                                    String timestamp = new SimpleDateFormat("yyyy-MM-dd'T'HH-mm-ss").format(new Date());
+                                    if (!BackupTask.doBackup(timestamp, false, ctx.getSource().getServer()))
+                                        ctx.getSource().sendFeedback(new LiteralText(Formatting.RED + "Backup failed. Check console for details."), false);
+                                    else
+                                        ctx.getSource().sendFeedback(new LiteralText(Formatting.GREEN + "Successfully created snapshot " + timestamp), false);
+                                });
+                                ctx.getSource().sendFeedback(new LiteralText("Backing up server..."), false);
+                                return 1;
                             } else {
                                 ctx.getSource().sendFeedback(new LiteralText(Formatting.RED + "Server not in a btrfs subvolume, plugin will not work."), false);
                                 return -1;
@@ -76,11 +76,11 @@ public class BtrCommand {
                             return false;
                         })
                         .executes(ctx -> {
-                            if (BtrBack.reloadSchedule()) {
-                                ctx.getSource().sendFeedback(new LiteralText(Formatting.GREEN + "Configuration reloaded."), false);
+                            if (BtrBack.reload()) {
+                                ctx.getSource().sendFeedback(new LiteralText(Formatting.GREEN + "Plugin and configuration reloaded."), false);
                                 return 1;
                             } else {
-                                ctx.getSource().sendFeedback(new LiteralText(Formatting.RED + "Failed to reload configuration."), false);
+                                ctx.getSource().sendFeedback(new LiteralText(Formatting.RED + "Failed to reload plugin and configuration."), false);
                                 return -1;
                             }
                         }))
@@ -131,20 +131,20 @@ public class BtrCommand {
                         .then(argument("timestamp", StringArgumentType.string())
                                 .suggests(new BtrBackRecordsSuggestionProvider())
                                 .executes(ctx -> {
-                                    ArrayList<String> backupsList = BtrRecord.listBackups(false);
-                                    String arg = ctx.getArgument("timestamp", String.class);
+                                    CompletableFuture.runAsync(() -> {
+                                        ArrayList<String> backupsList = BtrRecord.listBackups(false);
+                                        String arg = ctx.getArgument("timestamp", String.class);
 
-                                    if (backupsList.contains(arg)) {
-                                        if (PurgeTask.doPurge(arg)) {
-                                            ctx.getSource().sendFeedback(new LiteralText(Formatting.GREEN + "Successfully purged backups before " + arg), false);
-                                            return 1;
-                                        } else
-                                            ctx.getSource().sendFeedback(new LiteralText(Formatting.RED + "Failed to purge."), false);
-                                        return -1;
-                                    } else {
-                                        ctx.getSource().sendFeedback(new LiteralText(Formatting.RED + "No such backup."), false);
-                                        return -1;
-                                    }
+                                        if (backupsList.contains(arg)) {
+                                            if (PurgeTask.doPurge(arg)) {
+                                                ctx.getSource().sendFeedback(new LiteralText(Formatting.GREEN + "Successfully purged backups before " + arg), false);
+                                            } else
+                                                ctx.getSource().sendFeedback(new LiteralText(Formatting.RED + "Failed to purge."), false);
+                                        } else {
+                                            ctx.getSource().sendFeedback(new LiteralText(Formatting.RED + "No such backup."), false);
+                                        }
+                                    });
+                                    return 1;
                                 })))
         );
     }

@@ -16,11 +16,17 @@ public class BackupTask {
         if (!isBeforeRollback)
             server.saveAll(false, true, true);
         if (!BtrfsUtil.isSubVol(BtrBack.rootDir)) {
-            BtrBack.LOGGER.error("The server root is not in a btrfs subvolume. Backup canceled.");
+            if (!isBeforeRollback)
+                BtrBack.LOGGER.error("The server root is not in a btrfs subvolume. Backup canceled.");
+            else
+                System.err.println("The server root is not in a btrfs subvolume. Backup canceled.");
             return false;
         }
         if (!BtrfsUtil.createSnapshot(BtrBack.rootDir, BtrBack.backupsDir.resolve(timeStamp))) {
-            BtrBack.LOGGER.error("Cannot create snapshot " + timeStamp);
+            if (!isBeforeRollback)
+                BtrBack.LOGGER.error("Cannot create snapshot " + timeStamp);
+            else
+                System.err.println("Cannot create snapshot " + timeStamp);
             return false;
         }
         if (!isBeforeRollback) {
@@ -32,7 +38,7 @@ public class BackupTask {
         } else {
             if (!BtrRecord.addToRollbacks(timeStamp)) {
                 BtrfsUtil.deleteSubVol(BtrBack.backupsDir.resolve(timeStamp));
-                BtrBack.LOGGER.error("Cannot write the record to json file, backup canceled.");
+                System.err.println("Cannot write the record to json file, backup canceled.");
                 return false;
             }
         }
