@@ -9,6 +9,8 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 
+
+// TODO: Change json to some proper serialization
 public class BtrRecord {
     static JsonObject rootObj;
     static File jsonFile;

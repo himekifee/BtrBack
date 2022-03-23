@@ -24,7 +24,7 @@ public class BtrBack implements ModInitializer {
     public static final Path backupsDir = parentDir.resolve("btrbackups");
     public static final Path recordsJsonPath = backupsDir.resolve("backups.json");
     public static final Logger LOGGER = LogManager.getLogger();
-    private static BackupScheduler scheduler;
+    public static BackupScheduler scheduler;
 
 
     public void loadSchedule() {

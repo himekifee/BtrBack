@@ -11,6 +11,7 @@ import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.Date;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.locks.ReentrantLock;
 
 
 // Thanks to https://github.com/Szum123321/textile_backup
@@ -19,8 +20,8 @@ public class BackupScheduler {
     private long lastPurge;
     private int backupInterval = 0;
     private int purgeInterval = 0;      // This is the interval to indicate which backup to purge, not period between purge task runs. Period is always 1 hour
-    private boolean backupInProgress = false;
-    private boolean purgeInProgress = false;
+    private final ReentrantLock backupLock = new ReentrantLock();
+    private final ReentrantLock purgeLock = new ReentrantLock();
 
     public boolean reloadConfig() {
         ConfigHolder<BtrBackConfig> holder = AutoConfig.getConfigHolder(BtrBackConfig.class);
@@ -46,29 +47,33 @@ public class BackupScheduler {
         lastPurge = now;
     }
 
+    public void updateLastBackup() {
+        lastBackup = Instant.now().getEpochSecond();
+    }
+
+    public void updateLastPurge() {
+        lastPurge = Instant.now().getEpochSecond();
+    }
+
     public void tick(MinecraftServer server) {
         if (backupInterval < 1 || purgeInterval < 1) return;
 
         long now = Instant.now().getEpochSecond();
 
-        if (!backupInProgress)
+        if (backupLock.tryLock())
             if (lastBackup + backupInterval < now) {
-                backupInProgress = true;
                 CompletableFuture.runAsync(() -> {
                     BackupTask.doBackup(new SimpleDateFormat("yyyy-MM-dd'T'HH-mm-ss").format(new Date()), false, server);
-                    backupInProgress = false;
+                    backupLock.unlock();
                 });
-                lastBackup = now;
             }
 
-        if (!purgeInProgress)
-            if (lastPurge + purgeInterval < now) {
-                purgeInProgress = true;
+        if (purgeLock.tryLock())
+            if (lastPurge + 60 * 60 < now) {
                 CompletableFuture.runAsync(() -> {
                     PurgeTask.doScheduledPurge(purgeInterval);
-                    purgeInProgress = false;
+                    purgeLock.unlock();
                 });
-                lastPurge = now;
             }
     }
 }

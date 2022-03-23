@@ -46,6 +46,7 @@ public class BackupTask {
             BtrBack.LOGGER.info(Formatting.GREEN + "Snapshot " + timeStamp + " has been created.");
             server.getPlayerManager().broadcast(new LiteralText("Snapshot " + timeStamp + " has been created.").formatted(Formatting.BLUE), MessageType.CHAT, UUID.randomUUID());
         } else System.out.println("Snapshot " + timeStamp + " has been created.");
+        BtrBack.scheduler.updateLastBackup();
         return true;
     }
 }
